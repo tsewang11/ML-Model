@@ -1,43 +1,33 @@
 from fastapi import FastAPI
-from pydantic import BaseModel, Field 
+from pydantic import BaseModel, Field
 import torch
 import torch.nn.functional as F
 
 from model import load_model
 
+model, device = load_model("model_weights.pth")
 
 
-
-model=load_model("model_weights.pth")
-device = torch.device("mps")
-app = FastAPI(title="ML Model API", version="1.0.0")
-
-#Requet and response schemas
 class PredictRequest(BaseModel):
-    features: list[float] = Field(
-        ..., 
-        description ="Input features for the model. For now, expected length is 20.",
-        min_items=20,
-        max_items=20,
-    )
-    
-class PredictResponse (BaseModel):
+    features: list[float] = Field(..., min_items=20, max_items=20)
+
+
+class PredictResponse(BaseModel):
     predicted_class: int
     probabilities: list[float]
-    
-    
 
 
-# Root endpoint : just to test the server
+app = FastAPI(title="ML Model API", version="1.0.0")
+
+
 @app.get("/")
-def read_root():
+def root():
     return {"message": "ML API is running. Use POST /predict to get predictions."}
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(request: PredictRequest):
-    # Convert list to tensor of shape (1, num_features)
-    x = torch.tensor(request.features, dtype=torch.float32).unsqueeze(0).to(device)
+def predict(req: PredictRequest):
+    x = torch.tensor(req.features, dtype=torch.float32).unsqueeze(0).to(device)
 
     with torch.no_grad():
         logits = model(x)
